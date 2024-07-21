@@ -13,7 +13,7 @@ import type { GridLayoutIcon } from './types'
 import { HomeSubPage } from './types'
 
 const mainStore = useMainStore()
-const { handleBackToTop, scrollbarRef } = useBewlyApp()
+const { handleBackToTop, scrollbarRef, reachTop } = useBewlyApp()
 const handleThrottledBackToTop = useThrottleFn((targetScrollTop: number = 0) => handleBackToTop(targetScrollTop), 1000)
 
 const activatedPage = ref<HomeSubPage>(HomeSubPage.ForYou)
@@ -131,11 +131,31 @@ function toggleTabContentLoading(loading: boolean) {
 
 <template>
   <div>
-    <!-- Home search page mode background -->
-    <Transition name="bg">
+    <div
+      :style="{
+        height: reachTop ? '100dvh' : '60px',
+      }"
+      mt="calc(-1*var(--bew-top-bar-height))"
+      pointer-events-none
+      duration-640
+    />
+    <div
+      v-if="settings.useSearchPageModeOnHomePage && showSearchPageMode"
+      :style="{
+        opacity: reachTop ? 1 : 0,
+        pointerEvents: reachTop ? 'auto' : 'none',
+        height: reachTop ? '100%' : '0',
+        filter: reachTop ? 'unset' : 'blur(20px)',
+      }"
+      pos="absolute top-0 left-0" z-10
+      w-full mt="calc(-1*var(--bew-top-bar-height))"
+      duration-640
+    >
+      <!-- Home search page mode background -->
+      <!-- <Transition name="bg"> -->
       <div
         v-if="settings.useSearchPageModeOnHomePage && settings.individuallySetSearchPageWallpaper && showSearchPageMode"
-        pos="absolute left-0 top-0" w-full h-580px
+        pos="absolute left-0 top-0" w-full h-inherit
       >
         <div
           pos="absolute left-0 top-0" w-full h-inherit bg="cover center" z-1
@@ -164,32 +184,33 @@ function toggleTabContentLoading(loading: boolean) {
           </div>
         </Transition>
       </div>
-    </Transition>
+      <!-- </Transition> -->
+
+      <!-- Home search page mode content -->
+      <!-- <Transition name="content"> -->
+      <div
+        v-if="settings.useSearchPageModeOnHomePage && showSearchPageMode"
+        pos="absolute top-0 left-0"
+        flex="~ col justify-center items-center"
+        w-full
+        h-inherit
+        z-10 mb-4
+      >
+        <Logo
+          v-if="settings.searchPageShowLogo" :size="180" :color="settings.searchPageLogoColor === 'white' ? 'white' : 'var(--bew-theme-color)'"
+          :glow="settings.searchPageLogoGlow"
+          m="t--70px b-12" z-1
+        />
+        <SearchBar
+          :darken-on-focus="settings.searchPageDarkenOnSearchFocus"
+          :blurred-on-focus="settings.searchPageBlurredOnSearchFocus"
+          :focused-character="settings.searchPageSearchBarFocusCharacter"
+        />
+      </div>
+      <!-- </Transition> -->
+    </div>
 
     <main>
-      <!-- Home search page mode content -->
-      <Transition name="content">
-        <div
-          v-if="settings.useSearchPageModeOnHomePage && showSearchPageMode"
-          flex="~ col"
-          justify-center
-          items-center relative
-          w-full z-10 mb-4
-          h-500px
-        >
-          <Logo
-            v-if="settings.searchPageShowLogo" :size="180" :color="settings.searchPageLogoColor === 'white' ? 'white' : 'var(--bew-theme-color)'"
-            :glow="settings.searchPageLogoGlow"
-            m="t--70px b-12" z-1
-          />
-          <SearchBar
-            :darken-on-focus="settings.searchPageDarkenOnSearchFocus"
-            :blurred-on-focus="settings.searchPageBlurredOnSearchFocus"
-            :focused-character="settings.searchPageSearchBarFocusCharacter"
-          />
-        </div>
-      </Transition>
-
       <header
         pos="sticky top-80px" w-full z-9 mb-9 duration-300
         ease-in-out flex="~ justify-between items-start gap-4"
@@ -262,7 +283,7 @@ function toggleTabContentLoading(loading: boolean) {
 }
 .bg-enter-from,
 .bg-leave-to {
-  --uno: "h-100vh";
+  --uno: "h-full";
 }
 .bg-leave-to {
   --uno: "hidden";
