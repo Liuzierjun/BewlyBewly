@@ -104,6 +104,12 @@ async function setupStyles() {
     document.documentElement.classList.add('articlesPage')
   }
 
+  // topic page 话题页
+  else if (/https?:\/\/(?:www\.)?bilibili\.com\/v\/topic\/detail\/.*/.test(currentUrl)) {
+    await import('./pages/topicPage.scss')
+    document.documentElement.classList.add('topicPage')
+  }
+
   // 404 page 404页
   else if (/^https?:\/\/(?:www\.)?bilibili\.com\/404.*$/.test(currentUrl)) {
     await import('./pages/error404Page.scss')
@@ -124,7 +130,7 @@ async function setupStyles() {
     document.documentElement.classList.add('accountSettingsPage')
   }
 
-  // account settings page 登入頁
+  // login page 登入頁
   else if (/^https?:\/\/passport\.bilibili\.com\/login.*$/.test(currentUrl)) {
     await import('./pages/loginPage.scss')
     document.documentElement.classList.add('loginPage')
