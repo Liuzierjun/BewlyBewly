@@ -1,8 +1,4 @@
 <script setup lang="ts">
-import Input from '~/components/Input.vue'
-import Radio from '~/components/Radio.vue'
-import Slider from '~/components/Slider.vue'
-import Tooltip from '~/components/Tooltip.vue'
 import { WALLPAPERS } from '~/constants/imgs'
 import { settings } from '~/logic'
 import { compressAndResizeImage } from '~/utils/main'
@@ -138,19 +134,36 @@ function handleRemoveCustomWallpaper() {
             <div i-tabler:photo-off text="3xl $bew-text-3" />
           </picture>
 
-          <!-- Upload wallpaper input -->
-          <input
-            ref="uploadWallpaperRef" type="file" accept="image/*" hidden
-            @change="handleUploadWallpaper"
-          >
+          <Tooltip v-for="item in WALLPAPERS" :key="item.url" placement="top" :content="item.name" aspect-video>
+            <picture
+              aspect-video bg="$bew-fill-1" rounded="$bew-radius" overflow-hidden
+              un-border="4 transparent" w-full
+              :class="{ 'selected-wallpaper': isGlobal ? settings.wallpaper === item.url : settings.searchPageWallpaper === item.url }"
+              @click="changeWallpaper(item.url)"
+            >
+              <img
+                :src="item.thumbnail || item.url"
+                :alt="item.name"
+                w-full h-full object-cover
+                class="img-no-error"
+              >
+            </picture>
+          </Tooltip>
 
           <Tooltip placement="top" :content="settings.locallyUploadedWallpaper?.name || ''" aspect-video>
+            <!-- Upload wallpaper input -->
+            <input
+              ref="uploadWallpaperRef" type="file" accept="image/*"
+              hidden
+              @change="handleUploadWallpaper"
+            >
+
             <picture
               class="group"
               :class="{ 'selected-wallpaper': isGlobal
                 ? settings.wallpaper === settings.locallyUploadedWallpaper?.url
                 : settings.searchPageWallpaper === settings.locallyUploadedWallpaper?.url }"
-              aspect-video bg="$bew-theme-color-20" rounded="$bew-radius" overflow-hidden
+              aspect-video bg="$bew-fill-1" rounded="$bew-radius" overflow-hidden
               un-border="4 transparent" w-full
               flex="~ items-center justify-center"
               @click="changeWallpaper(settings.locallyUploadedWallpaper?.url || '')"
@@ -184,7 +197,7 @@ function handleRemoveCustomWallpaper() {
               >
                 <div
                   i-tabler:photo-up
-                  text="3xl $bew-theme-color"
+                  text="3xl $bew-text-3"
                 />
               </div>
               <img
@@ -192,22 +205,6 @@ function handleRemoveCustomWallpaper() {
                 :src="settings.locallyUploadedWallpaper.thumbnail || settings.locallyUploadedWallpaper.url"
                 :alt="settings.locallyUploadedWallpaper.name"
                 w-full h-full object-cover
-              >
-            </picture>
-          </Tooltip>
-
-          <Tooltip v-for="item in WALLPAPERS" :key="item.url" placement="top" :content="item.name" aspect-video>
-            <picture
-              aspect-video bg="$bew-fill-1" rounded="$bew-radius" overflow-hidden
-              un-border="4 transparent" w-full
-              :class="{ 'selected-wallpaper': isGlobal ? settings.wallpaper === item.url : settings.searchPageWallpaper === item.url }"
-              @click="changeWallpaper(item.url)"
-            >
-              <img
-                :src="item.thumbnail || item.url"
-                :alt="item.name"
-                w-full h-full object-cover
-                class="img-no-error"
               >
             </picture>
           </Tooltip>
