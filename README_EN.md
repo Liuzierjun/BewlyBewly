@@ -1,6 +1,6 @@
 # BewlyBewly
 
-English | [简体中文](README.md) | [繁體中文](README_TC.md) | [廣東話](README-jyut.md)
+[简体中文](README.md) | [繁體中文](README_TC.md) | [廣東話](README-jyut.md) | English
 
 <p align="center" style="margin-bottom: 0px !important;">
 <img width="300" alt="BewlyBewly icon" src="https://cdn.jsdelivr.net/gh/BewlyBewly/Imgs/logos/bewlybewly-vtuber-logo.png"><br/>
