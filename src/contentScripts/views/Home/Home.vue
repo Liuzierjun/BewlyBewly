@@ -3,7 +3,7 @@ import { useThrottleFn } from '@vueuse/core'
 
 import { useBewlyApp } from '~/composables/useAppProvider'
 import { TOP_BAR_VISIBILITY_CHANGE } from '~/constants/globalEvents'
-import { homePageGridLayout, settings } from '~/logic'
+import { gridLayout, settings } from '~/logic'
 import type { HomeTab } from '~/stores/mainStore'
 import { useMainStore } from '~/stores/mainStore'
 import emitter from '~/utils/mitt'
@@ -22,6 +22,7 @@ const pages = {
   [HomeSubPage.SubscribedSeries]: defineAsyncComponent(() => import('./components/SubscribedSeries.vue')),
   [HomeSubPage.Trending]: defineAsyncComponent(() => import('./components/Trending.vue')),
   [HomeSubPage.Ranking]: defineAsyncComponent(() => import('./components/Ranking.vue')),
+  [HomeSubPage.Live]: defineAsyncComponent(() => import('./components/Live.vue')),
 }
 const showSearchPageMode = ref<boolean>(false)
 const shouldMoveTabsUp = ref<boolean>(false)
@@ -31,9 +32,9 @@ const tabPageRef = ref()
 
 const gridLayoutIcons = computed((): GridLayoutIcon[] => {
   return [
-    { icon: 'i-f7:square-grid-3x2', iconActivated: 'i-f7:square-grid-3x2-fill', value: 'adaptive' },
-    { icon: 'i-f7:rectangle-grid-2x2', iconActivated: 'i-f7:rectangle-grid-2x2-fill', value: 'twoColumns' },
-    { icon: 'i-f7:rectangle-grid-1x2', iconActivated: 'i-f7:rectangle-grid-1x2-fill', value: 'oneColumn' },
+    { icon: 'i-mingcute:table-3-line', iconActivated: 'i-mingcute:table-3-fill', value: 'adaptive' },
+    { icon: 'i-mingcute:layout-grid-line', iconActivated: 'i-mingcute:layout-grid-fill', value: 'twoColumns' },
+    { icon: 'i-mingcute:list-check-3-line', iconActivated: 'i-mingcute:list-check-3-fill', value: 'oneColumn' },
   ]
 })
 
@@ -211,7 +212,7 @@ function toggleTabContentLoading(loading: boolean) {
 
     <main>
       <header
-        pos="sticky top-80px" w-full z-9 mb-9 duration-300
+        pos="sticky top-[calc(var(--bew-top-bar-height)+10px)]" w-full z-9 mb-8 duration-300
         ease-in-out flex="~ justify-between items-start gap-4"
         :class="{ hide: shouldMoveTabsUp }"
       >
@@ -247,15 +248,15 @@ function toggleTabContentLoading(loading: boolean) {
           <div
             v-for="icon in gridLayoutIcons" :key="icon.value"
             :style="{
-              backgroundColor: homePageGridLayout === icon.value ? 'var(--bew-theme-color-auto)' : '',
-              color: homePageGridLayout === icon.value ? 'var(--bew-text-auto)' : 'unset',
+              backgroundColor: gridLayout.home === icon.value ? 'var(--bew-theme-color-auto)' : '',
+              color: gridLayout.home === icon.value ? 'var(--bew-text-auto)' : 'unset',
             }"
             flex="~ justify-center items-center"
             w-full
             h-full p="x-2 y-1" rounded="$bew-radius-half" bg="hover:$bew-fill-2" duration-300
-            cursor-pointer @click="homePageGridLayout = icon.value"
+            cursor-pointer @click="gridLayout.home = icon.value"
           >
-            <div :class="homePageGridLayout === icon.value ? icon.iconActivated : icon.icon" text-base />
+            <div :class="gridLayout.home === icon.value ? icon.iconActivated : icon.icon" text-base />
           </div>
         </div>
       </header>
@@ -265,7 +266,7 @@ function toggleTabContentLoading(loading: boolean) {
           <Component
             :is="pages[activatedPage]" :key="activatedPage"
             ref="tabPageRef"
-            :grid-layout="homePageGridLayout"
+            :grid-layout="gridLayout.home"
             @before-loading="toggleTabContentLoading(true)"
             @after-loading="toggleTabContentLoading(false)"
           />

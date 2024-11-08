@@ -2,7 +2,8 @@
 import DOMPurify from 'dompurify'
 import { useI18n } from 'vue-i18n'
 
-import { useApiClient } from '~/composables/api'
+import { settings } from '~/logic'
+import api from '~/utils/api'
 import { revokeAccessKey } from '~/utils/authProvider'
 import { numFormatter } from '~/utils/dataFormatter'
 import { LV0_ICON, LV1_ICON, LV2_ICON, LV3_ICON, LV4_ICON, LV5_ICON, LV6_ICON, LV6_LIGHTNING_ICON } from '~/utils/lvIcons'
@@ -15,7 +16,6 @@ const props = defineProps<{
 }>()
 
 const { t } = useI18n()
-const api = useApiClient()
 
 const mid = computed(() => {
   return getUserID()
@@ -23,6 +23,7 @@ const mid = computed(() => {
 
 const otherLinks = computed((): { name: string, url: string, icon: string }[] => {
   return [
+
     {
       name: t('topbar.user_dropdown.uploads_manager'),
       url: 'https://member.bilibili.com/v2#/upload-manager/article',
@@ -32,6 +33,11 @@ const otherLinks = computed((): { name: string, url: string, icon: string }[] =>
       name: t('topbar.user_dropdown.account_settings'),
       url: 'https://account.bilibili.com/account/home',
       icon: 'i-solar:user-circle-bold-duotone',
+    },
+    {
+      name: t('topbar.user_dropdown.bilibili_premium'),
+      url: 'https://account.bilibili.com/big',
+      icon: 'i-solar:accessibility-bold-duotone',
     },
     {
       name: t('topbar.user_dropdown.b_coins_wallet'),
@@ -62,15 +68,9 @@ const otherLinks = computed((): { name: string, url: string, icon: string }[] =>
 })
 
 const levelProgressBarWidth = computed(() => {
-  const { next_exp: nextExp, current_exp: currentExp, current_min: minExp } = props.userInfo.level_info
+  const { next_exp: nextExp, current_exp: currentExp } = props.userInfo.level_info
 
-  const totalExp = nextExp - minExp
-  const earnedExp = currentExp - minExp
-
-  if (totalExp === 0)
-    return '0%'
-
-  const percentage = (earnedExp / totalExp) * 100
+  const percentage = (currentExp / nextExp) * 100
   return `${percentage.toFixed(2)}%`
 })
 
@@ -110,6 +110,21 @@ function getLvIcon(level: number, isSigma: boolean = false): string {
   }
   return levelIcons[level] || ''
 }
+
+function handleClickChannel() {
+  if (settings.value.topBarLinkOpenMode === 'newTab') {
+    window.open(`https://space.bilibili.com/${mid.value}`, '_blank')
+  }
+  else if (settings.value.topBarLinkOpenMode === 'currentTabIfNotHomepage') {
+    if (isHomePage())
+      window.open(`https://space.bilibili.com/${mid.value}`, '_blank')
+    else
+      window.open(`https://space.bilibili.com/${mid.value}`, '_self')
+  }
+  else {
+    window.open(`https://space.bilibili.com/${mid.value}`, '_self')
+  }
+}
 </script>
 
 <template>
@@ -120,31 +135,43 @@ function getLvIcon(level: number, isSigma: boolean = false): string {
     shadow="[var(--bew-shadow-3),var(--bew-shadow-edge-glow-1)]"
   >
     <div
-      text="xl" font-medium
+      text="xl" font-medium flex="~ items-center gap-2"
     >
-      {{ userInfo.uname ? userInfo.uname : '-' }}
+      <Button
+        v-if="settings.touchScreenOptimization"
+        type="secondary" strong @click="handleClickChannel"
+      >
+        {{ userInfo.uname ? userInfo.uname : '-' }}
+      </Button>
+      <span v-else>
+        {{ userInfo.uname ? userInfo.uname : '-' }}
+      </span>
     </div>
     <div
       text="xs $bew-text-2"
       m="t-1 b-2"
     >
-      <a
+      <ALink
         class="group mr-4"
         href="https://account.bilibili.com/account/coin"
-        :target="isHomePage() ? '_blank' : '_self'"
-      >{{ $t('topbar.user_dropdown.money') + (userInfo.money ?? '-') }}</a>
-      <a
+        type="topBar"
+      >
+        {{ $t('topbar.user_dropdown.money') + (userInfo.money ?? '-') }}
+      </ALink>
+      <ALink
         class="group"
         href="https://pay.bilibili.com/pay-v2-web/bcoin_index"
-        :target="isHomePage() ? '_blank' : '_self'"
-      >{{
-        $t('topbar.user_dropdown.b_coins') + (userInfo.wallet?.bcoin_balance ?? '-')
-      }}</a>
+        type="topBar"
+      >
+        {{
+          $t('topbar.user_dropdown.b_coins') + (userInfo.wallet?.bcoin_balance ?? '-')
+        }}
+      </ALink>
     </div>
 
-    <a
+    <ALink
       href="//account.bilibili.com/account/record?type=exp"
-      target="_blank"
+      type="topBar"
       block mb-2 w-full
       flex="~ col justify-center items-start"
     >
@@ -191,36 +218,36 @@ function getLvIcon(level: number, isSigma: boolean = false): string {
           v-html="DOMPurify.sanitize(getLvIcon(userInfo?.level_info?.current_level, userInfo?.is_senior_member))"
         />
       </template>
-    </a>
+    </ALink>
 
     <div grid="~ cols-3 gap-2" mb-2>
-      <a
+      <ALink
         class="channel-info-item"
         :href="`https://space.bilibili.com/${mid}/fans/follow`"
-        :target="isHomePage() ? '_blank' : '_self'"
         :title="`${userStat.following}`"
+        type="topBar"
       >
         <div class="num">
           {{ userStat.following ? numFormatter(userStat.following) : '0' }}
         </div>
         <div>{{ $t('topbar.user_dropdown.following') }}</div>
-      </a>
-      <a
+      </ALink>
+      <ALink
         class="channel-info-item"
         :href="`https://space.bilibili.com/${mid}/fans/fans`"
-        :target="isHomePage() ? '_blank' : '_self'"
         :title="`${userStat.follower}`"
+        type="topBar"
       >
         <div class="num">
           {{ userStat.follower ? numFormatter(userStat.follower) : '0' }}
         </div>
         <div>{{ $t('topbar.user_dropdown.followers') }}</div>
-      </a>
-      <a
+      </ALink>
+      <ALink
         class="channel-info-item"
         :href="`https://space.bilibili.com/${mid}/dynamic`"
-        :target="isHomePage() ? '_blank' : '_self'"
         :title="`${userStat.dynamic_count}`"
+        type="topBar"
       >
         <div class="num">
           {{
@@ -228,7 +255,7 @@ function getLvIcon(level: number, isSigma: boolean = false): string {
           }}
         </div>
         <div>{{ $t('topbar.user_dropdown.posts') }}</div>
-      </a>
+      </ALink>
     </div>
 
     <div

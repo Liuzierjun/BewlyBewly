@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { Ref } from 'vue'
 
-import { useApiClient } from '~/composables/api'
 import { useBewlyApp } from '~/composables/useAppProvider'
-import type { GridLayout } from '~/logic'
+import type { GridLayoutType } from '~/logic'
 import type { DataItem as MomentItem, MomentResult } from '~/models/moment/moment'
+import api from '~/utils/api'
 
 // https://github.com/starknt/BewlyBewly/blob/fad999c2e482095dc3840bb291af53d15ff44130/src/contentScripts/views/Home/components/ForYou.vue#L16
 interface VideoElement {
@@ -13,7 +13,7 @@ interface VideoElement {
 }
 
 const props = defineProps<{
-  gridLayout: GridLayout
+  gridLayout: GridLayoutType
 }>()
 
 const emit = defineEmits<{
@@ -28,8 +28,6 @@ const gridValue = computed((): string => {
     return '~ cols-1 xl:cols-2 gap-4'
   return '~ cols-1 gap-4'
 })
-
-const api = useApiClient()
 
 const videoList = ref<VideoElement[]>([])
 const isLoading = ref<boolean>(false)
@@ -99,6 +97,9 @@ async function getFollowedUsersVideos() {
   }
 
   try {
+    // 如果 videoList 不是空的，获取最后一个真实视频的 uniqueId
+    const lastUniqueId = videoList.value.length > 0 ? videoList.value.slice(-1)[0].uniqueId : ''
+
     let i = 0
     // https://github.com/starknt/BewlyBewly/blob/fad999c2e482095dc3840bb291af53d15ff44130/src/contentScripts/views/Home/components/ForYou.vue#L208
     const pendingVideos: VideoElement[] = Array.from({ length: 30 }, () => ({
@@ -134,9 +135,15 @@ async function getFollowedUsersVideos() {
         videoList.value = resData.map(item => ({ uniqueId: `${item.id_str}`, item }))
       }
       else {
-        resData.forEach((item) => {
+        resData.forEach((item, index) => {
+          const currentUniqueId = `${item.id_str}`
+
+          if (index === 0 && currentUniqueId === lastUniqueId) {
+            return
+          }
+
           videoList.value[lastVideoListLength++] = {
-            uniqueId: `${item.id_str}`,
+            uniqueId: currentUniqueId,
             item,
           }
         })
@@ -196,6 +203,12 @@ defineExpose({ initData })
           danmakuStr: video.item.modules.module_dynamic.major.archive?.stat.danmaku,
           capsuleText: video.item.modules.module_author.pub_time,
           bvid: video.item.modules.module_dynamic.major.archive?.bvid,
+          badge: video.item.modules.module_dynamic.major.archive?.badge.text !== '投稿视频' ? {
+            bgColor: video.item.modules.module_dynamic.major.archive?.badge.bg_color,
+            color: video.item.modules.module_dynamic.major.archive?.badge.color,
+            iconUrl: video.item.modules.module_dynamic.major.archive?.badge.icon_url,
+            text: video.item.modules.module_dynamic.major.archive?.badge.text,
+          } : undefined,
         } : undefined"
         show-preview
         :horizontal="gridLayout !== 'adaptive'"

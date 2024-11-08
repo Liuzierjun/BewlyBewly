@@ -4,13 +4,11 @@ import { onMounted, reactive, ref, watch } from 'vue'
 
 import Empty from '~/components/Empty.vue'
 import Loading from '~/components/Loading.vue'
-import { useApiClient } from '~/composables/api'
+import api from '~/utils/api'
 import { calcCurrentTime } from '~/utils/dataFormatter'
-import { getUserID, isHomePage, removeHttpFromUrl, scrollToTop } from '~/utils/main'
+import { getUserID, removeHttpFromUrl, scrollToTop } from '~/utils/main'
 
 import type { FavoriteCategory, FavoriteResource } from '../types'
-
-const api = useApiClient()
 
 const favoriteCategories = reactive<Array<FavoriteCategory>>([])
 const favoriteResources = reactive<Array<FavoriteResource>>([])
@@ -163,24 +161,26 @@ defineExpose({
       </h3>
 
       <div flex="~ gap-4">
-        <a
-          :href="playAllUrl" :target="isHomePage() ? '_blank' : '_self'" rel="noopener noreferrer"
+        <ALink
+          :href="playAllUrl"
+          type="topBar"
           flex="~" items="center"
         >
           <span text="sm">{{ $t('common.play_all') }}</span>
-        </a>
-        <a
-          :href="viewAllUrl" :target="isHomePage() ? '_blank' : '_self'" rel="noopener noreferrer"
+        </ALink>
+        <ALink
+          :href="viewAllUrl"
+          type="topBar"
           flex="~" items="center"
         >
           <span text="sm">{{ $t('common.view_all') }}</span>
-        </a>
+        </ALink>
       </div>
     </header>
 
     <main flex="~" overflow-hidden rounded="$bew-radius">
       <aside
-        w="120px" h="430px" overflow="y-scroll" rounded="l-$bew-radius"
+        w="140px" h="430px" overflow="y-auto" rounded="l-$bew-radius"
         flex="shrink-0" bg="$bew-fill-1"
       >
         <ul grid="~ cols-1">
@@ -235,11 +235,11 @@ defineExpose({
         <div v-if="!isLoading && favoriteResources.length > 0" min-h="50px" />
 
         <TransitionGroup name="list">
-          <a
+          <ALink
             v-for="item in favoriteResources"
             :key="item.id"
             :href="isMusic(item) ? `https://www.bilibili.com/audio/au${item.id}` : `//www.bilibili.com/video/${item.bvid}`"
-            :target="isHomePage() ? '_blank' : '_self'" rel="noopener noreferrer"
+            type="topBar"
             hover:bg="$bew-fill-2"
             rounded="$bew-radius"
             m="last:b-4" p="2"
@@ -292,7 +292,7 @@ defineExpose({
                 </div>
               </div>
             </section>
-          </a>
+          </ALink>
         </TransitionGroup>
 
         <!-- loading -->

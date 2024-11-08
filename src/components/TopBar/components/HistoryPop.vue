@@ -6,14 +6,13 @@ import { useI18n } from 'vue-i18n'
 import Empty from '~/components/Empty.vue'
 import Loading from '~/components/Loading.vue'
 import Progress from '~/components/Progress.vue'
-import { useApiClient } from '~/composables/api'
 import type { HistoryResult, List as HistoryItem } from '~/models/history/history'
 import { Business } from '~/models/history/history'
+import api from '~/utils/api'
 import { calcCurrentTime } from '~/utils/dataFormatter'
-import { isHomePage, removeHttpFromUrl, scrollToTop } from '~/utils/main'
+import { removeHttpFromUrl, scrollToTop } from '~/utils/main'
 
 const { t } = useI18n()
-const api = useApiClient()
 const historys = reactive<Array<HistoryItem>>([])
 const historyTabs = computed(() => [
   {
@@ -142,6 +141,11 @@ function getHistoryUrl(item: HistoryItem) {
  * @param view_at Last viewed timestamp
  */
 function getHistoryList(type: Business, view_at = 0 as number) {
+  if (isLoading.value)
+    return
+  if (noMoreContent.value)
+    return
+
   isLoading.value = true
   api.history.getHistoryList({
     type,
@@ -152,10 +156,8 @@ function getHistoryList(type: Business, view_at = 0 as number) {
         if (Array.isArray(res.data.list) && res.data.list.length > 0)
           historys.push(...res.data.list)
 
-        if (historys.length !== 0 && res.data.list.length < 20) {
-          isLoading.value = false
+        if (res.data.list.length < 20) {
           noMoreContent.value = true
-          return
         }
 
         noMoreContent.value = false
@@ -201,12 +203,13 @@ function getHistoryList(type: Business, view_at = 0 as number) {
           {{ tab.name }}
         </div>
       </div>
-      <a
-        href="https://www.bilibili.com/account/history" :target="isHomePage() ? '_blank' : '_self'" rel="noopener noreferrer"
+      <ALink
+        href="https://www.bilibili.com/account/history"
+        type="topBar"
         flex="~ items-center"
       >
         <span text="sm">{{ $t('common.view_all') }}</span>
-      </a>
+      </ALink>
     </header>
 
     <!-- historys wrapper -->
@@ -242,10 +245,11 @@ function getHistoryList(type: Business, view_at = 0 as number) {
         <div v-if="!isLoading && historys.length > 0" min-h="50px" />
 
         <TransitionGroup name="list">
-          <a
+          <ALink
             v-for="historyItem in historys"
             :key="historyItem.kid"
-            :href="getHistoryUrl(historyItem)" :target="isHomePage() ? '_blank' : '_self'" rel="noopener noreferrer"
+            :href="getHistoryUrl(historyItem)"
+            type="topBar"
             m="last:b-4" p="2"
             rounded="$bew-radius"
             hover:bg="$bew-fill-2"
@@ -364,12 +368,12 @@ function getHistoryList(type: Business, view_at = 0 as number) {
                   {{ historyItem.title }}
                 </h3>
                 <div text="$bew-text-2 sm" m="t-4" flex="~" align="items-center">
-                  <a
+                  <ALink
                     :href="`https://space.bilibili.com/${historyItem.author_mid}`"
-                    :target="isHomePage() ? '_blank' : '_self'" rel="noopener noreferrer"
+                    type="topBar"
                   >
                     {{ historyItem.author_name }}
-                  </a>
+                  </ALink>
                   <span
                     v-if="historyItem.live_status === 1"
                     text="$bew-theme-color"
@@ -391,7 +395,7 @@ function getHistoryList(type: Business, view_at = 0 as number) {
                 </p>
               </div>
             </section>
-          </a>
+          </ALink>
         </TransitionGroup>
 
         <!-- loading -->

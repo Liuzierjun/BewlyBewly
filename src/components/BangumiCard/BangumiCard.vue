@@ -35,13 +35,14 @@ const { isDark } = useDark()
 
 <template>
   <div mb-6>
-    <a
+    <ALink
       v-if="!skeleton && bangumi"
       class="group"
       :style="{
         display: horizontal ? 'flex' : 'block',
       }"
-      :href="bangumi.url" target="_blank" rel="noopener noreferrer"
+      :href="bangumi.url"
+      type="videoCard"
       gap-4 hover:bg="$bew-fill-2" hover:ring="8 $bew-fill-2"
       content-visibility-auto intrinsic-size-400px
       transition="all ease-in-out 300"
@@ -90,7 +91,6 @@ const { isDark } = useDark()
             aspect="12/16"
             pos="relative"
           >
-
             <!-- anime genres -->
             <div
               v-if="bangumi.evaluate || (Array.isArray(bangumi.tags) && bangumi.tags?.length > 0)"
@@ -107,7 +107,9 @@ const { isDark } = useDark()
                 );
               "
             >
-              <div mb-4 text="white group-hover:shadow-[0_0_4px_rgba(0,0,0,1)]">{{ bangumi.evaluate }}</div>
+              <div mb-4 text="white group-hover:shadow-[0_0_4px_rgba(0,0,0,1)]">
+                {{ bangumi.evaluate }}
+              </div>
               <template v-if="Array.isArray(bangumi.tags) && bangumi.tags?.length > 0">
                 <div flex="~ wrap" gap-2>
                   <span
@@ -158,31 +160,31 @@ const { isDark } = useDark()
           marginTop: horizontal ? '0' : '1rem',
         }"
       >
-        <p un-text="lg" mb-4>
+        <p un-text="lg" mb-2>
           <a
-            :href="bangumi.url" target="_blank" rel="noopener noreferrer"
+            :href="bangumi.url" target="_blank"
             class="keep-two-lines"
             :title="bangumi.title"
           >
             {{ bangumi.title }}
           </a>
         </p>
-        <p v-if="bangumi.view || bangumi.follow" text="$bew-text-2" mb-2>
+        <p v-if="bangumi.view || bangumi.follow" text="sm $bew-text-2" mb-2>
           <span v-if="bangumi.view" mr-4>{{ $t('common.view', { count: numFormatter(bangumi.view) }, bangumi.view) }}</span>
           <span v-if="bangumi.follow">{{ $t('common.anime_follow_count', { count: numFormatter(bangumi.follow) }, bangumi.follow) }}</span>
         </p>
-        <div text="$bew-text-2" flex flex-wrap gap-2 items-center>
+        <div text="sm $bew-text-2" flex flex-wrap gap-2 items-center>
           <div
             v-if="bangumi.capsuleText"
             text="$bew-theme-color" bg="$bew-theme-color-20"
-            p="x-3" h-27px lh-27px rounded-4
+            p="x-2" h-22px lh-22px rounded-24px
           >
             {{ bangumi.capsuleText }}
           </div>
-          <span> {{ bangumi.desc }} </span>
+          <span lh-22px> {{ bangumi.desc }} </span>
         </div>
       </div>
-    </a>
+    </ALink>
     <BangumiCardSkeleton
       v-else-if="skeleton"
       :horizontal="horizontal"

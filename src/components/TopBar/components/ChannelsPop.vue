@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 
-import { isHomePage } from '~/utils/main'
-
 const { t } = useI18n()
 
 const genres = computed(() => [
@@ -70,15 +68,15 @@ const otherLinks = computed(() => [
         :key="genre.name"
         class="link-item"
       >
-        <a
+        <ALink
           :href="genre.href"
-          :target="isHomePage() ? '_blank' : '_self'"
+          type="topBar"
         >
           <svg aria-hidden="true" class="svg-icon">
             <use :xlink:href="genre.icon" />
           </svg>
           <span>{{ genre.name }}</span>
-        </a>
+        </ALink>
       </li>
     </ul>
     <ul
@@ -91,9 +89,9 @@ const otherLinks = computed(() => [
         :key="otherLink.name"
         class="link-item group"
       >
-        <a
+        <ALink
           :href="otherLink.href"
-          :target="isHomePage() ? '_blank' : '_self'"
+          type="topBar"
         >
           <div v-if="otherLink.icon.startsWith('#')" class="icon">
             <svg
@@ -113,7 +111,7 @@ const otherLinks = computed(() => [
             />
           </div>
           <span>{{ otherLink.name }}</span>
-        </a>
+        </ALink>
       </li>
     </ul>
   </div>

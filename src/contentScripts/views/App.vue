@@ -1,21 +1,30 @@
 <script setup lang="ts">
-import { useThrottleFn, useToggle } from '@vueuse/core'
+import { useEventListener, useThrottleFn, useToggle } from '@vueuse/core'
 import type { Ref } from 'vue'
-import { useI18n } from 'vue-i18n'
-import browser from 'webextension-polyfill'
 
 import type { BewlyAppProvider } from '~/composables/useAppProvider'
 import { useDark } from '~/composables/useDark'
-import { OVERLAY_SCROLL_BAR_SCROLL } from '~/constants/globalEvents'
-import { AppPage, LanguageType } from '~/enums/appEnums'
-import { accessKey, settings } from '~/logic'
-import { getUserID, hexToRGBA, isHomePage, scrollToTop } from '~/utils/main'
+import { BEWLY_MOUNTED, DRAWER_VIDEO_ENTER_PAGE_FULL, DRAWER_VIDEO_EXIT_PAGE_FULL, OVERLAY_SCROLL_BAR_SCROLL } from '~/constants/globalEvents'
+import { AppPage } from '~/enums/appEnums'
+import { settings } from '~/logic'
+import { isHomePage, openLinkToNewTab, queryDomUntilFound, scrollToTop } from '~/utils/main'
 import emitter from '~/utils/mitt'
 
+import { setupNecessarySettingsWatchers } from './necessarySettingsWatchers'
+
 const { isDark } = useDark()
-const activatedPage = ref<AppPage>(settings.value.dockItemVisibilityList.find(e => e.visible === true)?.page ?? AppPage.Home)
-const { locale } = useI18n()
 const [showSettings, toggleSettings] = useToggle(false)
+
+// Get the 'page' query parameter from the URL
+function getPageParam(): AppPage | null {
+  const urlParams = new URLSearchParams(window.location.search)
+  const result = urlParams.get('page') as AppPage | null
+  if (result && Object.values(AppPage).includes(result))
+    return result
+  return null
+}
+
+const activatedPage = ref<AppPage>(getPageParam() || (settings.value.dockItemVisibilityList.find(e => e.visible === true)?.page || AppPage.Home))
 const pages = {
   [AppPage.Home]: defineAsyncComponent(() => import('./Home/Home.vue')),
   [AppPage.Search]: defineAsyncComponent(() => import('./Search/Search.vue')),
@@ -34,54 +43,39 @@ const handleThrottledBackToTop = useThrottleFn(() => handleBackToTop(), 1000)
 const topBarRef = ref()
 const reachTop = ref<boolean>(true)
 
+const iframeDrawerUrl = ref<string>('')
+const showIframeDrawer = ref<boolean>(false)
+
+const inIframe = computed((): boolean => {
+  return window.self !== window.top
+})
+
+const showBewlyPage = computed((): boolean => {
+  if (inIframe.value) {
+    return false
+  }
+  else {
+    return isHomePage() && !inIframe.value && !settings.value.useOriginalBilibiliHomepage
+  }
+})
+
 watch(
   () => activatedPage.value,
   () => {
+    // Update the URL query parameter when activatedPage changes
+    const url = new URL(window.location.href)
+    url.searchParams.set('page', activatedPage.value)
+    window.history.replaceState({}, '', url.toString())
     const osInstance = scrollbarRef.value.osInstance()
     osInstance.elements().viewport.scrollTop = 0
   },
 )
 
-watch(
-  () => settings.value.themeColor,
-  () => {
-    setAppThemeColor()
-  },
-  { immediate: true },
-)
-
-watch(() => settings.value.language, () => {
-  setAppLanguage()
-})
-
-watch(() => accessKey.value, () => {
-  handleChangeAccessKey()
-})
-
-watch(() => settings.value.adaptToOtherPageStyles, () => {
-  handleAdaptToOtherPageStylesChange()
-}, { immediate: true })
-
-watch(() => settings.value.blockAds, () => {
-  handleBlockAds()
-})
-
-watch(() => settings.value.disableFrostedGlass, () => {
-  handleDisableFrostedGlass()
-})
-
-watch(() => settings.value.reduceFrostedGlassBlur, () => {
-  handleReduceFrostedGlassBlur()
-})
-
-onBeforeMount(() => {
-  handleBlockAds()
-  handleDisableFrostedGlass()
-  handleReduceFrostedGlassBlur()
-})
+// Setup necessary settings watchers
+setupNecessarySettingsWatchers()
 
 onMounted(() => {
-  // openVideoPageIfBvidExists()
+  window.dispatchEvent(new CustomEvent(BEWLY_MOUNTED))
 
   if (isHomePage()) {
     // Force overwrite Bilibili Evolved body tag & html tag background color
@@ -95,16 +89,7 @@ onMounted(() => {
     else
       reachTop.value = true
   })
-
-  handleChangeAccessKey()
-  setAppLanguage()
 })
-
-function handleChangeAccessKey() {
-  // Clear accessKey if not logged in
-  if (!getUserID())
-    accessKey.value = ''
-}
 
 function changeActivatePage(pageName: AppPage) {
   const osInstance = scrollbarRef.value?.osInstance()
@@ -122,53 +107,11 @@ function changeActivatePage(pageName: AppPage) {
   activatedPage.value = pageName
 }
 
-async function setAppLanguage() {
-  // if there is first-time load extension, set the default language by browser display language
-  if (!settings.value.language) {
-    if (browser.i18n.getUILanguage() === 'zh-CN') {
-      settings.value.language = LanguageType.Mandarin_CN
-    }
-    else if (browser.i18n.getUILanguage() === 'zh-TW') {
-      // Since getUILanguage() cannot get the zh-HK language code
-      // use getAcceptLanguages() to get the language code
-      const languages: string[] = await browser.i18n.getAcceptLanguages()
-      if (languages.includes('zh-HK'))
-        settings.value.language = LanguageType.Cantonese
-      else settings.value.language = LanguageType.Mandarin_TW
-    }
-    else {
-      settings.value.language = LanguageType.English
-    }
-  }
-
-  locale.value = settings.value.language
-}
-
-function setAppThemeColor() {
-  const bewlyElement = document.querySelector('#bewly') as HTMLElement
-  if (bewlyElement) {
-    bewlyElement.style.setProperty('--bew-theme-color', settings.value.themeColor)
-    for (let i = 0; i < 9; i++)
-      bewlyElement.style.setProperty(`--bew-theme-color-${i + 1}0`, hexToRGBA(settings.value.themeColor, i * 0.1 + 0.1))
-  }
-
-  document.documentElement.style.setProperty('--bew-theme-color', settings.value.themeColor)
-  for (let i = 0; i < 9; i++)
-    document.documentElement.style.setProperty(`--bew-theme-color-${i + 1}0`, hexToRGBA(settings.value.themeColor, i * 0.1 + 0.1))
-}
-
 function handleBackToTop(targetScrollTop = 0 as number) {
   const osInstance = scrollbarRef.value?.osInstance()
 
   scrollToTop(osInstance.elements().viewport, targetScrollTop)
   topBarRef.value?.toggleTopBarVisible(true)
-}
-
-function handleAdaptToOtherPageStylesChange() {
-  if (settings.value.adaptToOtherPageStyles)
-    document.documentElement.classList.add('bewly-design')
-  else
-    document.documentElement.classList.remove('bewly-design')
 }
 
 function handleOsScroll() {
@@ -192,58 +135,76 @@ function handleOsScroll() {
     topBarRef.value?.handleScroll()
 }
 
-function handleBlockAds() {
-  // Do not use the "ads" keyword. AdGuard, AdBlock, and some ad-blocking extensions will
-  // detect and remove it when the class name contains "ads"
-  if (settings.value.blockAds)
-    document.documentElement.classList.add('block-useless-contents')
-  else
-    document.documentElement.classList.remove('block-useless-contents')
+function openIframeDrawer(url: string) {
+  const isSameOrigin = (origin: URL, destination: URL) =>
+    origin.protocol === destination.protocol && origin.host === destination.host && origin.port === destination.port
+
+  const currentUrl = new URL(location.href)
+  const destination = new URL(url)
+
+  if (!isSameOrigin(currentUrl, destination)) {
+    openLinkToNewTab(url)
+    return
+  }
+
+  iframeDrawerUrl.value = url
+  showIframeDrawer.value = true
 }
 
-function handleDisableFrostedGlass() {
-  const bewlyElement = document.querySelector('#bewly') as HTMLElement
-  if (settings.value.disableFrostedGlass) {
-    if (bewlyElement)
-      bewlyElement.classList.add('disable-frosted-glass')
+// In drawer video, watch btn className changed and post message to parent
+watchEffect(async (onCleanUp) => {
+  if (!inIframe.value)
+    return null
 
-    document.documentElement.classList.add('disable-frosted-glass')
+  const observer = new MutationObserver(([{ target: el }]) => {
+    if (!(el instanceof HTMLElement))
+      return null
+    if (el.classList.contains('bpx-state-entered')) {
+      parent.postMessage(DRAWER_VIDEO_ENTER_PAGE_FULL)
+    }
+    else {
+      parent.postMessage(DRAWER_VIDEO_EXIT_PAGE_FULL)
+    }
+  })
 
-    settings.value.reduceFrostedGlassBlur = false
-  }
-  else {
-    if (bewlyElement)
-      bewlyElement.classList.remove('disable-frosted-glass')
+  const abort = new AbortController()
+  queryDomUntilFound('.bpx-player-ctrl-btn.bpx-player-ctrl-web', 500, abort).then((openVideo2WebFullBtn) => {
+    if (!openVideo2WebFullBtn)
+      return
+    observer.observe(openVideo2WebFullBtn, { attributes: true })
+  })
 
-    document.documentElement.classList.remove('disable-frosted-glass')
-  }
-}
-
-function handleReduceFrostedGlassBlur() {
-  const bewlyElement = document.querySelector('#bewly') as HTMLElement
-  if (settings.value.reduceFrostedGlassBlur) {
-    if (bewlyElement)
-      bewlyElement.classList.add('reduce-frosted-glass-blur')
-
-    document.documentElement.classList.add('reduce-frosted-glass-blur')
-  }
-  else {
-    if (bewlyElement)
-      bewlyElement.classList.remove('reduce-frosted-glass-blur')
-
-    document.documentElement.classList.remove('reduce-frosted-glass-blur')
-  }
-}
+  onCleanUp(() => {
+    observer.disconnect()
+    abort.abort()
+  })
+})
 
 /**
  * Checks if the current viewport has a scrollbar.
  * @returns {boolean} Returns true if the viewport has a scrollbar, false otherwise.
  */
-function haveScrollbar() {
+async function haveScrollbar() {
+  await nextTick()
   const osInstance = scrollbarRef.value?.osInstance()
   const { viewport } = osInstance.elements()
   const { scrollHeight } = viewport // get scroll offset
   return scrollHeight > window.innerHeight
+}
+
+// When opening a video in drawer mode, listen for changes to the drawer's inner iframe url.
+// When the iframe's url changes, update the parent url to match the iframe's url.
+const beforeUrl = ref<string>(location.href.replace(/\/$/, ''))
+if (inIframe.value) {
+  useEventListener(window, 'pushstate', handleIframeUrlChange)
+  useEventListener(window, 'click', handleIframeUrlChange)
+
+  function handleIframeUrlChange() {
+    if (beforeUrl.value.replace(/\/$/, '') !== parent.location.href.replace(/\/$/, '')) {
+      parent.history.pushState(null, '', location.href.replace(/\/$/, ''))
+    }
+    beforeUrl.value = location.href.replace(/\/$/, '')
+  }
 }
 
 provide<BewlyAppProvider>('BEWLY_APP', {
@@ -254,6 +215,7 @@ provide<BewlyAppProvider>('BEWLY_APP', {
   handleBackToTop,
   handlePageRefresh,
   handleReachBottom,
+  openIframeDrawer,
   haveScrollbar,
 })
 </script>
@@ -267,7 +229,7 @@ provide<BewlyAppProvider>('BEWLY_APP', {
     text="$bew-text-1"
   >
     <!-- Background -->
-    <template v-if="isHomePage() && !settings.useOriginalBilibiliHomepage">
+    <template v-if="showBewlyPage">
       <AppBackground :activated-page="activatedPage" />
     </template>
 
@@ -277,9 +239,13 @@ provide<BewlyAppProvider>('BEWLY_APP', {
     </KeepAlive>
 
     <!-- Dock & RightSideButtons -->
-    <div pos="absolute top-0 left-0" w-full h-full overflow-hidden pointer-events-none>
+    <div
+      v-if="!inIframe"
+      pos="absolute top-0 left-0" w-full h-full overflow-hidden
+      pointer-events-none
+    >
       <Dock
-        v-if="isHomePage() && !settings.useOriginalBilibiliHomepage"
+        v-if="showBewlyPage"
         pointer-events-auto
         :activated-page="activatedPage"
         @change-page="(page: AppPage) => changeActivatePage(page)"
@@ -287,7 +253,7 @@ provide<BewlyAppProvider>('BEWLY_APP', {
         @refresh="handleThrottledPageRefresh"
         @back-to-top="handleThrottledBackToTop"
       />
-      <RightSideButtons
+      <SideBar
         v-else
         pointer-events-auto
         @settings-visibility-change="toggleSettings"
@@ -295,7 +261,7 @@ provide<BewlyAppProvider>('BEWLY_APP', {
     </div>
 
     <!-- TopBar -->
-    <div m-auto max-w="$bew-page-max-width">
+    <div v-if="!inIframe" m-auto max-w="$bew-page-max-width">
       <OldTopBar
         v-if="settings.useOldTopBar"
         pos="top-0 left-0" z="99 hover:1001" w-full
@@ -308,13 +274,13 @@ provide<BewlyAppProvider>('BEWLY_APP', {
 
     <div
       pos="absolute top-0 left-0" w-full h-full
-      :style="{ height: isHomePage() && !settings.useOriginalBilibiliHomepage ? '100dvh' : '0' }"
+      :style="{ height: showBewlyPage ? '100dvh' : '0' }"
     >
-      <template v-if="isHomePage() && !settings.useOriginalBilibiliHomepage">
+      <template v-if="showBewlyPage">
         <OverlayScrollbarsComponent ref="scrollbarRef" element="div" h-inherit defer @os-scroll="handleOsScroll">
           <main m-auto max-w="$bew-page-max-width">
             <div
-              p="t-80px" m-auto
+              p="t-[calc(var(--bew-top-bar-height)+10px)]" m-auto
               w="lg:85% md:[calc(90%-60px)] [calc(100%-140px)]"
             >
               <!-- control button group -->
@@ -332,6 +298,12 @@ provide<BewlyAppProvider>('BEWLY_APP', {
         </OverlayScrollbarsComponent>
       </template>
     </div>
+
+    <IframeDrawer
+      v-if="showIframeDrawer"
+      :url="iframeDrawerUrl"
+      @close="showIframeDrawer = false"
+    />
   </div>
 </template>
 

@@ -2,8 +2,10 @@
 import { onKeyStroke, useDebounceFn } from '@vueuse/core'
 import DOMPurify from 'dompurify'
 
-import { useApiClient } from '~/composables/api'
+import { settings } from '~/logic'
+import api from '~/utils/api'
 import { findLeafActiveElement } from '~/utils/element'
+import { isHomePage } from '~/utils/main'
 
 import type { HistoryItem, SuggestionItem, SuggestionResponse } from './searchHistoryProvider'
 import {
@@ -19,7 +21,6 @@ defineProps<{
   focusedCharacter?: string
 }>()
 
-const api = useApiClient()
 const keywordRef = ref<HTMLInputElement>()
 const isFocus = ref<boolean>(false)
 const keyword = ref<string>('')
@@ -76,7 +77,15 @@ const handleInput = useDebounceFn(() => {
 
 async function navigateToSearchResultPage(keyword: string) {
   if (keyword) {
-    window.open(`//search.bilibili.com/all?keyword=${encodeURIComponent(keyword)}`, '_blank')
+    let target = '_blank'
+    if (settings.value.searchBarLinkOpenMode === 'currentTabIfNotHomepage')
+      target = isHomePage() ? '_blank' : '_self'
+    else if (settings.value.searchBarLinkOpenMode === 'currentTab')
+      target = '_self'
+    else if (settings.value.searchBarLinkOpenMode === 'newTab')
+      target = '_blank'
+
+    window.open(`//search.bilibili.com/all?keyword=${encodeURIComponent(keyword)}`, target)
     const searchItem = {
       value: keyword,
       timestamp: Number(new Date()),
@@ -169,7 +178,7 @@ async function handleClearSearchHistory() {
 </script>
 
 <template>
-  <div id="search-wrap" w="full" max-w="550px" pos="relative">
+  <div id="search-wrap" w="full" max-w="550px" h-46px pos="relative">
     <div
       v-if="!darkenOnFocus && isFocus"
       pos="fixed top-0 left-0"
@@ -192,7 +201,12 @@ async function handleClearSearchHistory() {
       :style="{ backdropFilter: isFocus ? 'blur(15px)' : 'blur(0)' }"
     />
 
-    <div class="search-bar group" :class="isFocus ? 'focus' : ''" flex="~" items-center pos="relative">
+    <div
+      class="search-bar group"
+      :class="isFocus ? 'focus' : ''"
+      flex="~ items-center" pos="relative"
+      h-inherit
+    >
       <Transition name="focus-character">
         <img
           v-show="focusedCharacter && isFocus" :src="focusedCharacter"
@@ -205,7 +219,7 @@ async function handleClearSearchHistory() {
         v-model="keyword"
         rounded="60px focus:$bew-radius"
         p="l-6 r-18 y-3"
-        h-50px
+        h-inherit
         text="$bew-text-1"
         un-border="1 solid $bew-border-color focus:$bew-theme-color"
         transition="all duration-300"
@@ -234,7 +248,7 @@ async function handleClearSearchHistory() {
         transition="all duration-300"
         border-none
         outline-none
-        pos="absolute right-2"
+        pos="absolute right-6px"
         bg="hover:$bew-fill-2"
         filter="group-focus-within:~"
         style="--un-drop-shadow: drop-shadow(0 0 6px var(--bew-theme-color))"
@@ -378,7 +392,6 @@ async function handleClearSearchHistory() {
 
   @mixin search-content-item {
     --uno: "px-4 py-2 w-full rounded-$bew-radius duration-300 cursor-pointer not-first:mt-1 tracking-wider hover:bg-$bew-fill-2";
-    --uno: "hover:shadow-[var(--bew-shadow-1),var(--bew-shadow-edge-glow-1)]";
   }
 
   #search-history {
