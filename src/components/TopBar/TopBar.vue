@@ -65,12 +65,19 @@ const isSearchPage = computed((): boolean => {
 const forceWhiteIcon = computed((): boolean => {
   if (
     // 分區頁面由於上面有背景，所以強制 icon 變白色用於區分背景
-    // channel, anime, chinese anime, tv shows, movie, variety shows, mooc
-    /https?:\/\/(?:www.)?bilibili.com\/(?:v|anime|guochuang|tv|movie|variety|mooc).*/.test(location.href)
-  )
+    // channel, anime, chinese anime, tv shows, movie, variety shows, mooc but not including video page
+    (
+      /https?:\/\/(?:www.)?bilibili.com\/(?:v|anime|guochuang|tv|movie|variety|mooc).*/.test(location.href)
+      && !/https?:\/\/(?:www.)?bilibili.com\/video.*/.test(location.href)
+    )
+    // watch later & history page
+    || /https?:\/\/(?:www.)?bilibili.com\/(?:watchlater|account\/history).*/.test(location.href)
+  ) {
     return true
-  if (!isHomePage())
+  }
+  if (!isHomePage()) {
     return false
+  }
   if (activatedPage.value === AppPage.Search) {
     if (settings.value.individuallySetSearchPageWallpaper) {
       if (settings.value.searchPageWallpaper)
