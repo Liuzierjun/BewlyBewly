@@ -29,7 +29,7 @@ const shouldMoveTabsUp = ref<boolean>(false)
 const tabContentLoading = ref<boolean>(false)
 const currentTabs = ref<HomeTab[]>([])
 const tabPageRef = ref()
-
+const topBarVisibility = ref<boolean>(false)
 const gridLayoutIcons = computed((): GridLayoutIcon[] => {
   return [
     { icon: 'i-mingcute:table-3-line', iconActivated: 'i-mingcute:table-3-fill', value: 'adaptive' },
@@ -64,6 +64,7 @@ onMounted(() => {
   showSearchPageMode.value = true
   emitter.off(TOP_BAR_VISIBILITY_CHANGE)
   emitter.on(TOP_BAR_VISIBILITY_CHANGE, (val) => {
+    topBarVisibility.value = val
     shouldMoveTabsUp.value = false
 
     // Allow moving tabs up only when the top bar is not hidden & is set to auto-hide
@@ -212,7 +213,7 @@ function toggleTabContentLoading(loading: boolean) {
 
     <main>
       <header
-        pos="sticky top-[calc(var(--bew-top-bar-height)+10px)]" w-full z-9 mb-8 duration-300
+        pos="sticky top-[calc(var(--bew-top-bar-height)+10px)]" w-full z-9 m="b-4" duration-300
         ease-in-out flex="~ justify-between items-start gap-4"
         :class="{ hide: shouldMoveTabsUp }"
       >
@@ -238,7 +239,7 @@ function toggleTabContentLoading(loading: boolean) {
               v-for="tab in currentTabs" :key="tab.page"
               :class="{ 'tab-activated': activatedPage === tab.page }"
               px-3 h-inherit
-              bg="transparent hover:$bew-fill-2" rounded-full
+              bg="transparent hover:$bew-fill-2" text="$bew-text-2 hover:$bew-text-1" fw-bold rounded-full
               cursor-pointer duration-300
               flex="~ gap-2 items-center shrink-0" relative
               @click="handleChangeTab(tab)"
@@ -250,7 +251,7 @@ function toggleTabContentLoading(loading: boolean) {
                   v-show="activatedPage === tab.page && tabContentLoading"
                   i-svg-spinners:ring-resize
                   pos="absolute right-4px top-4px" duration-300
-                  text="8px $bew-text-auto"
+                  text="8px white"
                 />
               </Transition>
             </button>
@@ -267,12 +268,9 @@ function toggleTabContentLoading(loading: boolean) {
         >
           <div
             v-for="icon in gridLayoutIcons" :key="icon.value"
-            :style="{
-              backgroundColor: gridLayout.home === icon.value ? 'var(--bew-theme-color-auto)' : '',
-              color: gridLayout.home === icon.value ? 'var(--bew-text-auto)' : 'unset',
-            }"
+            :class="{ 'grid-layout-item-activated': gridLayout.home === icon.value }"
             flex="~ justify-center items-center"
-            h-full aspect-square
+            h-full aspect-square text="$bew-text-2 hover:$bew-text-1"
             rounded-full bg="hover:$bew-fill-2" duration-300
             cursor-pointer
             @click="gridLayout.home = icon.value"
@@ -288,6 +286,7 @@ function toggleTabContentLoading(loading: boolean) {
             :is="pages[activatedPage]" :key="activatedPage"
             ref="tabPageRef"
             :grid-layout="gridLayout.home"
+            :top-bar-visibility="topBarVisibility"
             @before-loading="toggleTabContentLoading(true)"
             @after-loading="toggleTabContentLoading(false)"
           />
@@ -328,7 +327,7 @@ function toggleTabContentLoading(loading: boolean) {
 
 .home-tabs-inside {
   :deep([data-overlayscrollbars-contents]) {
-    --uno: "flex items-center gap-1 h-inherit rounded-full";
+    --uno: "flex items-center gap-1 h-inherit rounded-$bew-radius-half";
   }
   :deep(.os-scrollbar) {
     --uno: "mb--4px";
@@ -336,6 +335,10 @@ function toggleTabContentLoading(loading: boolean) {
 }
 
 .tab-activated {
-  --uno: "bg-$bew-theme-color-auto text-$bew-text-auto border-$bew-theme-color dark:border-white";
+  --uno: "bg-$bew-theme-color-auto text-$bew-text-auto";
+}
+
+.grid-layout-item-activated {
+  --uno: "bg-$bew-theme-color-auto text-$bew-text-auto";
 }
 </style>

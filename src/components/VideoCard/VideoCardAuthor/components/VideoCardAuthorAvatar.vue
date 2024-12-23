@@ -36,7 +36,7 @@ const displayedAvatars = computed(() => {
       :href="getAuthorJumpUrl(item)" target="_blank"
       rounded="1/2"
       object="center cover" bg="$bew-skeleton" cursor="pointer"
-      position-relative
+      position-absolute top-0 inline-block
       :style="{
         zIndex: displayedAvatars.length - index,
         left: `${index * 6}px`,
@@ -48,7 +48,6 @@ const displayedAvatars = computed(() => {
       <!-- Avatar -->
       <Picture
         :src="`${removeHttpFromUrl(item.authorFace)}@50w_50h_1c`"
-        pos="absolute top-0"
         loading="lazy"
         w-inherit h-inherit
         rounded="1/2"

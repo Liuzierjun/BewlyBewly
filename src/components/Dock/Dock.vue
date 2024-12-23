@@ -11,20 +11,29 @@ import { useMainStore } from '~/stores/mainStore'
 import Tooltip from '../Tooltip.vue'
 import type { HoveringDockItem } from './types'
 
-defineProps<{
+const props = defineProps<{
   activatedPage: AppPage
 }>()
 
-// const emit = defineEmits(['changePage', 'settingsVisibilityChange', 'refresh', 'backToTop'])
+// const emit = defineEmits(['pageChange', 'settingsVisibilityChange', 'refresh', 'backToTop'])
 const emit = defineEmits<{
-  (e: 'changePage', page: AppPage): void
+  (e: 'dockItemClick', dockItem: DockItem): void
   (e: 'settingsVisibilityChange'): void
   (e: 'refresh'): void
   (e: 'backToTop'): void
 }>()
+
 const mainStore = useMainStore()
 const { isDark, toggleDark } = useDark()
 const { reachTop } = useBewlyApp()
+
+const hideDock = ref<boolean>(false)
+const hoveringDockItem = reactive<HoveringDockItem>({
+  themeMode: false,
+  settings: false,
+})
+const currentDockItems = ref<DockItem[]>([])
+const activatedDockItem = ref<DockItem>()
 
 const tooltipPlacement = computed(() => {
   if (settings.value.dockPosition === 'left')
@@ -36,53 +45,87 @@ const tooltipPlacement = computed(() => {
   return 'right'
 })
 
-const hideDock = ref<boolean>(false)
-const hoveringDockItem = reactive<HoveringDockItem>({
-  themeMode: false,
-  settings: false,
+/**
+ * Whether to show the back to top or refresh button
+ */
+const showBackToTopOrRefreshButton = computed((): boolean => {
+  const dockItemConfig = settings.value.dockItemsConfig.find(e => e.page === props.activatedPage)
+  if (dockItemConfig && dockItemConfig.useOriginalBiliPage) {
+    return false
+  }
+
+  return settings.value.moveBackToTopOrRefreshButtonToDock
+    && props.activatedPage !== AppPage.Search
 })
-const currentDockItems = ref<DockItem[]>([])
 
 watch(() => settings.value.autoHideDock, (newValue) => {
   hideDock.value = newValue
-})
+}, { immediate: true })
 
 // use Json stringify to watch the changes of the array item properties
-watch(() => JSON.stringify(settings.value.dockItemVisibilityList), () => {
+watch(() => JSON.stringify(settings.value.dockItemsConfig), () => {
   currentDockItems.value = computeDockItem()
-})
+}, { immediate: true })
 
 function computeDockItem(): DockItem[] {
+  // Transfer the data from dockItemVisibilityList into dockItemsConfig
+  if (settings.value.dockItemVisibilityList.length > 0 && settings.value.dockItemsConfig.length === 0) {
+    settings.value.dockItemsConfig = settings.value.dockItemVisibilityList.map(item =>
+      ({
+        page: item.page,
+        visible: item.visible,
+        openInNewTab: false,
+        useOriginalBiliPage: false,
+      }))
+  }
+
+  if (Array.isArray(settings.value.dockItemsConfig) && settings.value.dockItemsConfig.length < mainStore.dockItems.length) {
+    // Add missing items to dockItemsConfig
+    const missingItems = mainStore.dockItems.filter(dock => !settings.value.dockItemsConfig.some(item => item.page === dock.page))
+    settings.value.dockItemsConfig = [
+      ...settings.value.dockItemsConfig,
+      ...missingItems.map(dock => ({ page: dock.page, visible: true, openInNewTab: false, useOriginalBiliPage: false })),
+    ]
+  }
   // if dockItemVisibilityList not fresh , set it to default
-  if (!settings.value.dockItemVisibilityList.length || settings.value.dockItemVisibilityList.length !== mainStore.dockItems.length)
-    settings.value.dockItemVisibilityList = mainStore.dockItems.map(dock => ({ page: dock.page, visible: true }))
+  else if (!Array.isArray(settings.value.dockItemsConfig) || settings.value.dockItemsConfig.length !== mainStore.dockItems.length) {
+    settings.value.dockItemsConfig = mainStore.dockItems.map(dock =>
+      ({ page: dock.page, visible: true, openInNewTab: false, useOriginalBiliPage: false }),
+    )
+  }
 
   const targetDockItems: DockItem[] = []
 
-  settings.value.dockItemVisibilityList.forEach((item) => {
+  settings.value.dockItemsConfig.forEach((item) => {
     const foundItem = mainStore.dockItems.find(defaultItem => defaultItem.page === item.page)
+    // If the dock item does not have Bewly page, then use the original BiliBili page
+    if (!foundItem?.hasBewlyPage)
+      item.useOriginalBiliPage = true
+
     item.visible && targetDockItems.push({
       i18nKey: foundItem?.i18nKey || '',
       icon: foundItem?.icon || '',
       iconActivated: foundItem?.iconActivated || '',
       page: foundItem?.page || AppPage.Home,
+      openInNewTab: item.openInNewTab,
+      useOriginalBiliPage: item.useOriginalBiliPage || !foundItem?.hasBewlyPage,
+      url: foundItem?.url || '',
+      hasBewlyPage: foundItem?.hasBewlyPage || false,
     })
   })
   return targetDockItems
 }
-
-onMounted(() => {
-  if (settings.value.autoHideDock)
-    hideDock.value = true
-
-  currentDockItems.value = computeDockItem()
-})
 
 function toggleHideDock(hide: boolean) {
   if (settings.value.autoHideDock)
     hideDock.value = hide
   else
     hideDock.value = false
+}
+
+function handleDockItemClick(dockItem: DockItem) {
+  activatedDockItem.value = dockItem
+  emit('dockItemClick', dockItem)
 }
 
 function handleBackToTopOrRefresh() {
@@ -128,10 +171,11 @@ function handleBackToTopOrRefresh() {
             <button
               class="dock-item group"
               :class="{
-                active: activatedPage === dockItem.page,
-                inactive: hoveringDockItem.themeMode && isDark,
+                'active': activatedPage === dockItem.page,
+                'inactive': hoveringDockItem.themeMode && isDark,
+                'disable-glowing-effect': settings.disableDockGlowingEffect,
               }"
-              @click="emit('changePage', dockItem.page)"
+              @click="handleDockItemClick(dockItem)"
             >
               <div
                 v-show="activatedPage !== dockItem.page"
@@ -162,14 +206,18 @@ function handleBackToTopOrRefresh() {
             pos="absolute top-0 left-0 group-hover:top-2px group-hover:left--4px"
             w-full h-full bg-white rounded="1/2"
             z--2 pointer-events-none
-            shadow="group-hover:[-8px_4px_160px_20px_hsla(226deg,85%,77%,1),-8px_4px_100px_12px_hsla(226deg,85%,77%,0.8),-8px_4px_60px_10px_hsla(226deg,85%,77%,0.6),-8px_4px_20px_4px_hsla(226deg,85%,77%,0.4),-4px_2px_8px_0_hsla(226deg,85%,77%,0.8)]"
+            :shadow="
+              settings.disableDockGlowingEffect
+                ? 'none'
+                : 'group-hover:[-8px_4px_160px_20px_hsla(226deg,85%,77%,1),-8px_4px_100px_12px_hsla(226deg,85%,77%,0.8),-8px_4px_60px_10px_hsla(226deg,85%,77%,0.6),-8px_4px_20px_4px_hsla(226deg,85%,77%,0.4),-4px_2px_8px_0_hsla(226deg,85%,77%,0.8)]'"
             opacity-0 group-hover:opacity-100
             duration-600
           />
 
           <button
             class="dock-item"
-            bg="!dark-hover:$bew-bg" transform="!dark-hover:scale-100" shadow="!dark-hover:[inset_4px_-2px_8px_hsla(226deg,85%,77%,1)]"
+            bg="!dark-hover:$bew-bg" transform="!dark-hover:scale-100"
+            :shadow="settings.disableDockGlowingEffect ? 'none' : '!dark-hover:[inset_4px_-2px_8px_hsla(226deg,85%,77%,1)]'"
             pointer-events-auto
             @click="toggleDark"
             @mouseenter="hoveringDockItem.themeMode = true"
@@ -204,7 +252,7 @@ function handleBackToTopOrRefresh() {
       </div>
 
       <button
-        v-if="settings.moveBackToTopOrRefreshButtonToDock && activatedPage !== AppPage.Search"
+        v-if="showBackToTopOrRefreshButton"
         class="back-to-top-or-refresh-btn"
         :class="{
           inactive: hoveringDockItem.themeMode && isDark,
@@ -335,9 +383,9 @@ function handleBackToTopOrRefresh() {
 }
 
 .dock-item {
-  --shadow-dark: 0 4px 30px 4px rgba(255, 255, 255, 0.6);
+  --shadow-dark: 0 4px 30px 4px var(--bew-theme-color-60);
   --shadow-active: 0 4px 30px var(--bew-theme-color-70);
-  --shadow-dark-active: 0 4px 20px rgba(255, 255, 255, 0.8);
+  --shadow-dark-active: 0 4px 20px var(--bew-theme-color-80);
   --shadow-active-active: 0 4px 20px var(--bew-theme-color-90);
 
   --uno: "relative transform active:important-scale-90 hover:scale-110";
@@ -365,8 +413,12 @@ function handleBackToTopOrRefresh() {
       var(--bew-shadow-2);
   }
 
+  &.disable-glowing-effect {
+    box-shadow: var(--bew-shadow-edge-glow-1), var(--bew-shadow-1) !important;
+  }
+
   &.active {
-    --uno: "important-bg-$bew-theme-color-auto text-$bew-text-auto";
+    --uno: "important-bg-$bew-theme-color-80 text-white";
     --uno: "shadow-$shadow-active dark:shadow-$shadow-dark";
     --uno: "active:shadow-$shadow-active-active dark-active:shadow-$shadow-dark-active";
   }
